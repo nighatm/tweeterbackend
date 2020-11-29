@@ -662,45 +662,45 @@ def comments():
                 
                 # update it to comment
 
-    elif request.method == 'DELETE':
-        conn = None
-        cursor = None
-        rows = None
-        user = None
-        loginToken = request.json.get("loginToken")
-        tweetId = request.json.get("tweetId")
-        try:
-            conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
-            cursor=conn.cursor()
-            cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [loginToken,])
-            user = cursor.fetchone()
-            print(user)
-            if user !=None:
-                cursor.execute("DELETE FROM tweet WHERE id=? AND userId=?", [tweetId,user[0],])
-                conn.commit()
-                rows=cursor.rowcount
-        except mariadb.ProgrammingError as error:
-                print("Programming Error.. ")
-                print(error)
-        except mariadb.DatabaseError as error:
-                print("Database Error...")
-                print(error)
-        except mariadb.OperationalError as error:
-                print("Connection Error...")
-                print(error)
-        except Exception as error:
-                print("This is a general error to be checked! ")
-                print(error)
-        finally:
-            if(cursor != None):
-                cursor.close()
-            if(conn != None):
-                conn.rollback()
-                conn.close()
-            if(rows == 1):           
-                return Response(json.dumps("Deleted successfully", default=str), mimetype="application/json", status=204)
-            else:
-                return Response("Something went wrong!", mimetype="text/html", status=500)
+    # elif request.method == 'DELETE':
+    #     conn = None
+    #     cursor = None
+    #     rows = None
+    #     user = None
+    #     loginToken = request.json.get("loginToken")
+    #     tweetId = request.json.get("tweetId")
+    #     try:
+    #         conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
+    #         cursor=conn.cursor()
+    #         cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [loginToken,])
+    #         user = cursor.fetchone()
+    #         print(user)
+    #         if user !=None:
+    #             cursor.execute("DELETE FROM tweet WHERE id=? AND userId=?", [tweetId,user[0],])
+    #             conn.commit()
+    #             rows=cursor.rowcount
+    #     except mariadb.ProgrammingError as error:
+    #             print("Programming Error.. ")
+    #             print(error)
+    #     except mariadb.DatabaseError as error:
+    #             print("Database Error...")
+    #             print(error)
+    #     except mariadb.OperationalError as error:
+    #             print("Connection Error...")
+    #             print(error)
+    #     except Exception as error:
+    #             print("This is a general error to be checked! ")
+    #             print(error)
+    #     finally:
+    #         if(cursor != None):
+    #             cursor.close()
+    #         if(conn != None):
+    #             conn.rollback()
+    #             conn.close()
+    #         if(rows == 1):           
+    #             return Response(json.dumps("Deleted successfully", default=str), mimetype="application/json", status=204)
+    #         else:
+    #             return Response("Something went wrong!", mimetype="text/html", status=500)
 
 
 

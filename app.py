@@ -499,6 +499,8 @@ def tweets():
                 return Response(json.dumps("Deleted successfully", default=str), mimetype="application/json", status=204)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
+
+# Users have ability to comment on tweets, edit and delete those comments 
 @app.route('/api/comments', methods=[ 'GET', 'POST', 'PATCH', 'DELETE'])
 def comments():
     if request.method == 'GET':
@@ -570,7 +572,7 @@ def comments():
                 cursor.execute("INSERT INTO comment(tweetId, userId, content) VALUES(?,?,?)", [tweet_Id,user[0][2],content, ])
                 conn.commit()
                 rows= cursor.rowcount
-                cursor.execute("SELECT c.id, c.tweetId, c.userId, c.content, c.createdAt, u.username FROM user u INNER JOIN comment c ON u.id = c.userId WHERE c.tweetId = ?",[tweet_Id, ] )
+                cursor.execute("SELECT c.*, u.username FROM user u INNER JOIN comment c ON u.id = c.userId WHERE c.tweetId = ?",[tweet_Id, ] )
                 user=cursor.fetchall()
       
         except mariadb.ProgrammingError as error:
@@ -600,107 +602,108 @@ def comments():
                     "content": content,
                     "createdAt" :createdAt ,
                     }
-                return Response(json.dumps(comments_info, default=str), mimetype="application/json", status=200)
+                return Response(json.dumps(comments_info, default=str), mimetype="application/json", status=201)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
-    # elif request.method == 'PATCH':
-    #     conn = None
-    #     cursor = None
-    #     rows = None
-    #     updated_comment = None
-    #     user=None
-    #     updatedcomment_info={}
-    #     loginToken = request.json.get("loginToken")
-    #     comment_Id = request.json.get("id")
-    #     comment_content = request.json.get("content")
-    #     try:
-    #         conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
-    #         cursor=conn.cursor()
+#    has an error check with ALEX
+    elif request.method == 'PATCH':
+        conn = None
+        cursor = None
+        rows = None
+        updated_comment = None
+        user=None
+        createdAt=None
+        updatedcomment_info={}
+        loginToken = request.json.get("loginToken")
+        comment_Id = request.json.get("id")
+        comment_content = request.json.get("content")
+        try:
+            conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
+            cursor=conn.cursor()
 
-    #         cursor.execute("SELECT * FROM user_session WHERE loginToken =? ", [loginToken,])
-    #         user=cursor.fetchall()
+            cursor.execute("SELECT * FROM user_session WHERE loginToken =? ", [loginToken,])
+            user=cursor.fetchall()
 
-    #         cursor.execute("UPDATE comment SET content = ? WHERE id=? AND userId=?", [comment_content,comment_Id,user[0][0] ])
-    #         conn.commit()
-    #         rows = cursor.rowcount
+            cursor.execute("UPDATE comment SET content = ? WHERE id=? AND userId=?", [comment_content,comment_Id,user[0][0] ])
+            conn.commit()
+            rows = cursor.rowcount
             
-    #         cursor.execute("SELECT * FROM comment WHERE id=?", [comment_Id,])
-    #         updated_comment=cursor.fetchall()
-    #         print(updated_comment)
+            cursor.execute("SELECT SELECT c.*, u.username FROM user u INNER JOIN comment c ON u.id = c.userId WHERE c.id=?", [comment_Id,])
+            updated_comment=cursor.fetchall()
+            print(updated_comment)
 
-    #     except mariadb.ProgrammingError as error:
-    #             print("Programming Error.. ")
-    #             print(error)
-    #     except mariadb.DatabaseError as error:
-    #             print("Database Error...")
-    #             print(error)
-    #     except mariadb.OperationalError as error:
-    #             print("Connection Error...")
-    #             print(error)
-    #     except Exception as error:
-    #             print("This is a general error to be checked! ")
-    #             print(error)
-    #     finally:
-    #         if(cursor != None):
-    #             cursor.close()
-    #         if(conn != None):
-    #             conn.rollback()
-    #             conn.close()
-    #         if(rows == 1):
-    #             updatedcomment_info={
-    #                 "commentId": comment_Id,
-    #                 "tweetId": ,
-    #                 "userId": ,
-    #                 "username": ,
-    #                 "content": comment_content,
-    #                 "createdAt": 
-    #                 }
+        except mariadb.ProgrammingError as error:
+                print("Programming Error.. ")
+                print(error)
+        except mariadb.DatabaseError as error:
+                print("Database Error...")
+                print(error)
+        except mariadb.OperationalError as error:
+                print("Connection Error...")
+                print(error)
+        except Exception as error:
+                print("This is a general error to be checked! ")
+                print(error)
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(rows == 1):
+                updatedcomment_info={
+                    "commentId": comment_Id,
+                    "tweetId": user[0][1],
+                    "userId": user[0][0],
+                    "username":user[0][5] ,
+                    "content": comment_content,
+                    "createdAt": createdAt
+                    }
               
-    #             return Response(json.dumps(updatedcomment_info, default=str), mimetype="application/json", status=200)
-    #         else:
-    #             return Response("Something went wrong!", mimetype="text/html", status=500)
+                return Response(json.dumps(updatedcomment_info, default=str), mimetype="application/json", status=200)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
                 
-                # update it to comment
-
-    # elif request.method == 'DELETE':
-    #     conn = None
-    #     cursor = None
-    #     rows = None
-    #     user = None
-    #     loginToken = request.json.get("loginToken")
-    #     tweetId = request.json.get("tweetId")
-    #     try:
-    #         conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
-    #         cursor=conn.cursor()
-    #         cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [loginToken,])
-    #         user = cursor.fetchone()
-    #         print(user)
-    #         if user !=None:
-    #             cursor.execute("DELETE FROM tweet WHERE id=? AND userId=?", [tweetId,user[0],])
-    #             conn.commit()
-    #             rows=cursor.rowcount
-    #     except mariadb.ProgrammingError as error:
-    #             print("Programming Error.. ")
-    #             print(error)
-    #     except mariadb.DatabaseError as error:
-    #             print("Database Error...")
-    #             print(error)
-    #     except mariadb.OperationalError as error:
-    #             print("Connection Error...")
-    #             print(error)
-    #     except Exception as error:
-    #             print("This is a general error to be checked! ")
-    #             print(error)
-    #     finally:
-    #         if(cursor != None):
-    #             cursor.close()
-    #         if(conn != None):
-    #             conn.rollback()
-    #             conn.close()
-    #         if(rows == 1):           
-    #             return Response(json.dumps("Deleted successfully", default=str), mimetype="application/json", status=204)
-    #         else:
-    #             return Response("Something went wrong!", mimetype="text/html", status=500)
+# DELETE a comment owned by a user
+    elif request.method == 'DELETE':
+        conn = None
+        cursor = None
+        rows = None
+        user = None
+        loginToken = request.json.get("loginToken")
+        comment_Id = request.json.get("commentId")
+        try:
+            conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
+            cursor=conn.cursor()
+            cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [loginToken,])
+            user = cursor.fetchone()
+            print(user)
+            if user !=None:
+                cursor.execute("DELETE FROM comment WHERE id=? AND userId=?", [comment_Id,user[0],])
+                conn.commit()
+                rows=cursor.rowcount
+        except mariadb.ProgrammingError as error:
+                print("Programming Error.. ")
+                print(error)
+        except mariadb.DatabaseError as error:
+                print("Database Error...")
+                print(error)
+        except mariadb.OperationalError as error:
+                print("Connection Error...")
+                print(error)
+        except Exception as error:
+                print("This is a general error to be checked! ")
+                print(error)
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(rows == 1):           
+                return Response(json.dumps("Comment deleted successfully", default=str), mimetype="application/json", status=204)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
 
 
 

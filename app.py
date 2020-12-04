@@ -24,6 +24,8 @@ def login():
         userPassword = request.json.get("password")
         rows = None
         user = None
+        user_info = {}
+        
         try:
             conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
             cursor=conn.cursor()
@@ -54,20 +56,28 @@ def login():
                 conn.rollback()
                 conn.close()
             if(rows == 1):
-                return Response("Successfully Logged in..", mimetype = "text/html", status = 201)
+                user_info = {
+                    "email": user[0][1],
+                    "username": user[0][2],
+                    "password": user[0][3],
+                    "bio": user[0][4],
+                    "birthdate": user[0][5],
+                    "userId": user[0][0],
+                    "loginToken": loginToken
+                }
+                return Response(json.dumps(user_info, default=str), mimetype="application/json", status=201)
             else:
-                return Response("Something went wrong!", mimetype = "text/html", status = 500)
+                return Response("Something went wrong!", mimetype="text/html", status=500)
 
     elif request.method == 'DELETE':
         conn = None
         cursor = None
         rows = None
-        userId = request.json.get("id")
         loginToken = request.json.get("loginToken")
         try:
             conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
-            cursor=conn.cursor()
-            cursor.execute("DELETE FROM user_session WHERE loginToken=?", [loginToken])
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM user_session WHERE loginToken = ?", [loginToken,])
             conn.commit()
             rows = cursor.rowcount
         except mariadb.ProgrammingError as error:
@@ -102,7 +112,7 @@ def users():
         rows = None
         users_dict={}
         users_info=[]
-        user_Id = request.json.get("id")
+        user_Id = request.args.get("id")
         try:
             conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
             cursor=conn.cursor()
@@ -257,6 +267,7 @@ def users():
                         "username": user[0][2],
                         "bio": user[0][3],
                         "birthdate" : user[0][4],
+                        "loginToken": loginToken
                     } 
                 return Response(json.dumps(users_data, default=str), mimetype="application/json", status=200)
             else:
@@ -270,8 +281,11 @@ def users():
         try:
             conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
             cursor=conn.cursor()
-            cursor.execute("DELETE FROM user WHERE loginToken = ?",[loginToken,])
-            conn.commit()        
+            cursor.execute("SELECT * FROM user_session WHERE loginToken=?", [loginToken,])
+            user = cursor.fetchone()
+            print(user)
+            if user !=None:
+                cursor.execute("DELETE FROM user WHERE id=? AND password=?", [user[0],userPassword, ])            
             rows= cursor.rowcount      
         except mariadb.ProgrammingError as error:
                 print("Programming Error.. ")
@@ -310,10 +324,10 @@ def tweets():
         try:
             conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
             cursor=conn.cursor()
-            if user_id == None and user_Id == "":
+            if user_id == None:
                 cursor.execute("SELECT t.id, t.userId, t.content, t.createdAt, u.username FROM tweet t INNER JOIN user u ON t.userId = u.id")
             else:
-                cursor.execute("SELECT t.id, t.userId, t.content, t.createdAt, u.username FROM tweet t INNER JOIN user u ON t.userId = u.id WHERE u.id=?", [user_id],)
+                cursor.execute("SELECT t.id, t.userId, t.content, t.createdAt, u.username FROM tweet t INNER JOIN user u ON t.userId = u.id WHERE u.id=?", [user_id, ])
             rows = cursor.fetchall()
             print (rows)
         except mariadb.ProgrammingError as error:
@@ -335,7 +349,6 @@ def tweets():
                 conn.rollback()
                 conn.close()
             if(rows!= None):
-                users=[]
                 for row in rows:
                     tweet_dict={
                         "tweetId": row[0],
@@ -488,9 +501,9 @@ def tweets():
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
-# USERS HAVE ABILITY TO COMMENT 
-# Users have ability to comment on tweets, edit and delete those comments 
+# USERS HAVE ABILITY TO COMMENT ON TWEETS, EDIT, AND DELETE COMMENTS
 @app.route('/api/comments', methods=[ 'GET', 'POST', 'PATCH', 'DELETE'])
+# SEND BACK COMMENTS ON TWEETS
 def comments():
     if request.method == 'GET':
         conn = None
@@ -541,6 +554,7 @@ def comments():
                 return Response(json.dumps(comments_info, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
+    # CREATE NEW COMMENT ON A SPECIFIC TWEET
     elif request.method == 'POST':
         conn = None
         cursor = None
@@ -554,14 +568,14 @@ def comments():
         try:
             conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
             cursor=conn.cursor()           
-            cursor.execute("SELECT * FROM user_session WHERE loginToken =?", [loginToken,])
+            cursor.execute("SELECT userId FROM user_session WHERE loginToken =?", [loginToken,])
             user=cursor.fetchall()
             print(user)
             if user !=None:
-                cursor.execute("INSERT INTO comment(tweetId, userId, content) VALUES(?,?,?)", [tweet_Id,user[0][2],content, ])
+                cursor.execute("INSERT INTO comment(tweetId, userId, content) VALUES(?,?,?)", [tweet_Id,user[0][0],content, ])
                 conn.commit()
                 rows= cursor.rowcount
-                cursor.execute("SELECT c.*, u.username FROM user u INNER JOIN comment c ON u.id = c.userId WHERE c.tweetId = ?",[tweet_Id, ] )
+                cursor.execute("SELECT c.*, u.username FROM comment c INNER JOIN user u ON u.id = c.userId WHERE c.tweetId = ?",[tweet_Id, ] )
                 user=cursor.fetchall()
       
         except mariadb.ProgrammingError as error:
@@ -586,7 +600,7 @@ def comments():
                 comments_info={
                     "commentId": user[0][0],
                     "tweetId": tweet_Id,
-                    "userId" : user[0][1] ,
+                    "userId" : user[0][2] ,
                     "username":user[0][5] ,
                     "content": content,
                     "createdAt" :createdAt ,
@@ -594,7 +608,7 @@ def comments():
                 return Response(json.dumps(comments_info, default=str), mimetype="application/json", status=201)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
-#    has an error check with ALEX
+    # UPDATE A COMMENT
     elif request.method == 'PATCH':
         conn = None
         cursor = None
@@ -653,7 +667,7 @@ def comments():
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
                 
-# DELETE a comment owned by a user
+# DELETE A COMMENT
     elif request.method == 'DELETE':
         conn = None
         cursor = None
@@ -694,7 +708,9 @@ def comments():
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
+# FOLLOW IS WHEN A USER "FOLLOWS" ANOTHER USER
 @app.route('/api/follows', methods=[ 'GET','POST', 'POST','DELETE'])
+# SEND BACK INFORMATION ABOUT ALL THE USERS BEING FOLLOWED BY A USER "BASED ON USERID"
 def follows():
     if request.method == 'GET':
         conn = None
@@ -741,6 +757,8 @@ def follows():
                 return Response(json.dumps(follows_info, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
+
+    # CREATE A "FOLLOW" RELATIONSHIP BETWEEN 2 USERS
     elif request.method == 'POST':
         conn = None
         cursor = None
@@ -781,6 +799,8 @@ def follows():
                 return Response("Successfully Followed", mimetype="application/json", status=204)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
+
+    # DELETE A FOLLOW RELATIONSHIP "UNFOLLOW A USER"
     elif request.method == 'DELETE':
         conn = None
         cursor = None
@@ -820,7 +840,8 @@ def follows():
                 return Response(json.dumps("Comment deleted successfully", default=str), mimetype="application/json", status=204)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
-            
+
+# WILL SEND BACK INFORMATION ABOUT ALL USERS BEING FOLLOWED BY A USER "FOLLOWER"
 @app.route('/api/followers', methods=[ 'GET'])
 def followers():
     if request.method == 'GET':
@@ -833,6 +854,7 @@ def followers():
         try:
             conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
             cursor=conn.cursor()
+            
             cursor.execute("SELECT u.id, u.email, u.bio, u.username, u.birthdate FROM user u INNER JOIN follow f ON u.id = f.followerId WHERE f.followId=? ", [userId, ])
             rows = cursor.fetchall()
             print(rows)
@@ -869,7 +891,7 @@ def followers():
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
-
+# USERS HAVE ABILITY TO LIKE TWEETS AND UNLIKE TWEETS THEY HAVE ALREADY LIKED
 @app.route('/api/tweet-likes', methods=[ 'GET', 'POST', 'DELETE'])
 def tweetLikes():
     if request.method == 'GET':
@@ -1002,7 +1024,7 @@ def tweetLikes():
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
-
+# USERS HAVE ABILITY TO LIKE COMMENTS AND UNLIKE COMMENTS THEY HAVE ALREADY LIKED 
 @app.route('/api/comment-likes', methods=[ 'GET', 'POST', 'DELETE'])
 def commentlikes():
     if request.method == 'GET':

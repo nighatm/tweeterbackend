@@ -59,7 +59,6 @@ def login():
                 user_info = {
                     "email": user[0][1],
                     "username": user[0][2],
-                    "password": user[0][3],
                     "bio": user[0][4],
                     "birthdate": user[0][5],
                     "userId": user[0][0],
@@ -200,7 +199,6 @@ def users():
                 user_info = {
                     "email": userEmail,
                     "username": userName,
-                    "password": userPassword,
                     "bio": userBio,
                     "birthdate": userBirthdate,
                     "userId": user_id,
@@ -215,11 +213,7 @@ def users():
         rows = None
         user = None
         users_data={}
-        userEmail = request.json.get("email")
-        userName = request.json.get("username")
-        userPassword = request.json.get("password")
         userBio = request.json.get("bio")
-        userBirthdate = request.json.get("birthdate")
         loginToken = request.json.get("loginToken")
         try:
             conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
@@ -267,7 +261,6 @@ def users():
                         "username": user[0][2],
                         "bio": user[0][3],
                         "birthdate" : user[0][4],
-                        "loginToken": loginToken
                     } 
                 return Response(json.dumps(users_data, default=str), mimetype="application/json", status=200)
             else:
@@ -618,7 +611,7 @@ def comments():
         createdAt=None
         updatedcomment_info={}
         loginToken = request.json.get("loginToken")
-        comment_Id = request.json.get("id")
+        comment_Id = request.json.get("commentId")
         comment_content = request.json.get("content")
         try:
             conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
@@ -626,14 +619,17 @@ def comments():
 
             cursor.execute("SELECT * FROM user_session WHERE loginToken =? ", [loginToken,])
             user=cursor.fetchall()
+            
+            cursor.execute("SELECT userId FROM comment WHERE id =? ", [comment_Id,])
+            user=cursor.fetchall()
 
-            cursor.execute("UPDATE comment SET content = ? WHERE id=? AND userId=?", [comment_content,comment_Id,user[0][0] ])
+            cursor.execute("UPDATE comment SET content = ? WHERE id=? AND userId=?", [comment_content,comment_Id,user[0][0], ])
             conn.commit()
             rows = cursor.rowcount
             
-            cursor.execute("SELECT SELECT c.*, u.username FROM user u INNER JOIN comment c ON u.id = c.userId WHERE c.id=?", [comment_Id,])
-            updated_comment=cursor.fetchall()
-            print(updated_comment)
+            cursor.execute("SELECT c.*, u.username FROM user u INNER JOIN comment c ON u.id = c.userId WHERE c.id=?", [comment_Id,])
+            user=cursor.fetchall()
+            print(user)
 
         except mariadb.ProgrammingError as error:
                 print("Programming Error.. ")
@@ -656,8 +652,8 @@ def comments():
             if(rows == 1):
                 updatedcomment_info={
                     "commentId": comment_Id,
-                    "tweetId": user[0][1],
-                    "userId": user[0][0],
+                    "tweetId":user[0][1],
+                    "userId": user[0][2],
                     "username":user[0][5] ,
                     "content": comment_content,
                     "createdAt": createdAt
@@ -854,7 +850,6 @@ def followers():
         try:
             conn = mariadb.connect(host=dbcreds.host, port=dbcreds.port,user=dbcreds.user, password=dbcreds.password,database=dbcreds.database)
             cursor=conn.cursor()
-            
             cursor.execute("SELECT u.id, u.email, u.bio, u.username, u.birthdate FROM user u INNER JOIN follow f ON u.id = f.followerId WHERE f.followId=? ", [userId, ])
             rows = cursor.fetchall()
             print(rows)
@@ -978,9 +973,7 @@ def tweetLikes():
                 conn.rollback()
                 conn.close()
             if(rows==1):
-
                 return Response(json.dumps("tweet liked", default=str), mimetype="application/json", status=201)
-
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
@@ -1060,7 +1053,6 @@ def commentlikes():
                 conn.rollback()
                 conn.close()
             if(rows!= None):
-                users=[]
                 for row in rows:
                     commentlike_dict={
                         "commentId": row[0],
@@ -1077,7 +1069,8 @@ def commentlikes():
         cursor = None
         rows = None
         user = None
-        commentlike_info={}
+        commentlike_info=[]
+        commentlike_dict={}
         loginToken = request.json.get("loginToken")
         commentId = request.json.get("commentId")
         try:
@@ -1109,7 +1102,14 @@ def commentlikes():
                 conn.rollback()
                 conn.close()
             if(rows==1):
-                return Response(json.dumps("comment liked", default=str), mimetype="application/json", status=201)
+                for row in rows:
+                    commentlike_dict={
+                        "commentId": row[0],
+                        "userId" : row[1],
+                        "username": row[2]
+                    }
+                    commentlike_info.append(commentlike_dict)
+                return Response(json.dumps(commentlike_info, default=str), mimetype="application/json", status=201)
 
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
